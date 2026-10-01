@@ -1,10 +1,26 @@
 # PolypVision AI
 
-PolypVision AI is a from-scratch PyTorch baseline for binary colonoscopy polyp segmentation on Kvasir-SEG. It is a research and learning prototype, not a clinical diagnostic system.
+From-scratch PyTorch U-Net baseline for colonoscopy polyp segmentation on Kvasir-SEG.
+
+PolypVision AI is a research and learning prototype, not a clinical diagnostic system.
 
 ## Overview
 
 The project implements a custom U-Net-style encoder-decoder with skip connections, trained from random initialization. It exists to make dataset checks, preprocessing, optimization, evaluation, and inference understandable and reproducible.
+
+## Polyp Segmentation at a Glance
+
+![PolypVision qualitative segmentation](results/qualitative_results.png)
+
+- Dataset: Kvasir-SEG
+- Valid image-mask pairs: 1,000
+- Split: 700 train / 150 validation / 150 test
+- Input: 256 x 256 RGB
+- Model: custom PolypUNet
+- Parameters: 7,760,097
+- Best development validation Dice: 0.6195
+
+The displayed examples come from the seeded validation split. The green overlay shows the predicted segmentation, while the probability map shows pixel-level model output before thresholding. The map is not a calibrated clinical confidence measure.
 
 ## Dataset
 
@@ -32,6 +48,8 @@ Images are converted to RGB, resized to 256 x 256 with bilinear interpolation, a
 ## Architecture
 
 The custom `PolypUNet` uses convolution + ReLU blocks, max pooling, transposed-convolution upsampling, and skip concatenation. It has no BatchNorm, pretrained encoder, attention module, or torchvision/MONAI segmentation backbone.
+
+![PolypUNet architecture](results/polypunet_architecture.png)
 
 ```text
 Trainable parameters: 7,760,097
@@ -61,6 +79,22 @@ These values are historical notebook results and are not recomputed or combined 
 | Earlier interim test evaluation: Dice | **0.5083** |
 | Earlier interim test evaluation: IoU | **0.3753** |
 | Earlier interim test evaluation: loss | **0.9241** |
+
+## Qualitative Results
+
+The figure below shows the input image, ground-truth mask, probability map, thresholded predicted mask, and predicted overlay for four images from the seeded Kvasir-SEG validation split.
+
+![PolypUNet qualitative results](results/qualitative_results.png)
+
+Examples were selected by an explicit rule rather than visual cherry-picking: the two highest per-image Dice scores were included as stronger examples, and the two lowest per-image Dice scores were included as challenging examples. The stronger cases had Dice 0.9651 and 0.9602; both selected challenging cases had Dice 0.0000.
+
+### Failure Analysis
+
+The separate test-set examples below show two visible failure patterns. In one case, the probability map remains weak and diffuse and the thresholded prediction misses the annotated polyp almost entirely. In the other, the model assigns probability to a broad region around the annotated target, producing substantial over-segmentation and false-positive tissue in the overlay. These examples also show why validation Dice alone is insufficient for understanding medical-image segmentation behavior: it does not reveal where boundaries are uncertain, regions are missed, or surrounding tissue is included.
+
+![Exploratory test failure cases](results/test_failure_cases.png)
+
+These are exploratory error-analysis examples from the test split, which had already been inspected during development. They are not evidence from an untouched final test evaluation and should not be interpreted as final generalization performance. They are research segmentation errors, not clinical findings, and motivate further work on generalization, boundary quality, and evaluation protocols that inspect qualitative behavior alongside aggregate metrics.
 
 The interim test metrics belong to an earlier checkpoint evaluated before later development continued. They must not be presented as test performance for the later checkpoint that reached validation Dice 0.6195. The simple flip augmentation experiment did not improve validation Dice. See [results/README.md](results/README.md) and the notebooks for provenance.
 
@@ -101,6 +135,8 @@ python -m src.evaluate \
 ```
 
 The original experimental notebook is retained in `notebooks/PolypVision_original.ipynb`, including historical Colab paths, for provenance. The cleaned notebook documents the experiments but is not a replacement for a preregistered evaluation protocol.
+
+The repository does not include `results/training_curves.png`: although the notebook contains printed epoch logs, the later development phase does not preserve complete training-loss history alongside the validation history in a standalone, verified array. A learning curve is therefore omitted rather than reconstructed from incomplete records.
 
 ## Limitations and Future Work
 
